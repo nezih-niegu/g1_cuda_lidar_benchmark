@@ -1,0 +1,32 @@
+Panels:
+  - Class: rviz_common/Displays
+    Name: Displays
+Visualization Manager:
+  Class: ''
+  Displays:
+    - Class: rviz_default_plugins/Grid
+      Enabled: true
+      Name: Grid
+    - Class: rviz_default_plugins/PointCloud2
+      Enabled: true
+      Name: Filtered cloud
+      Topic:
+        Value: /benchmark/filtered_points
+        Reliability Policy: Best Effort
+      Size (Pixels): 2
+      Style: Points
+    - Class: rviz_default_plugins/PointCloud2
+      Enabled: true
+      Name: Accumulated voxel map
+      Topic:
+        Value: /benchmark/map_points
+        Reliability Policy: Best Effort
+      Size (Pixels): 3
+      Style: Points
+  Global Options:
+    Fixed Frame: lidar_smoke_frame
+    Frame Rate: 30
+  Tools:
+    - Class: rviz_default_plugins/Interact
+    - Class: rviz_default_plugins/MoveCamera
+    - Class: rviz_default_plugins/Select
