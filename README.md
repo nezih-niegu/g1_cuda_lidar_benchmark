@@ -197,3 +197,11 @@ Try a controlled scan-density sweep by changing the *upstream* G1 LiDAR configur
 ### Starter RViz view and profiler helper
 
 Run `ros2 launch g1_cuda_lidar_benchmark visualize.launch.py` for a saved RViz layout (its initial Fixed Frame is `lidar_smoke_frame` for the synthetic smoke test; **change it** to the real MuJoCo LiDAR frame or TF-backed target for upstream data). `bash src/g1_cuda_lidar_benchmark/scripts/profile_mapper.sh optimized ~/g1_profiles/optimized nsys` is a convenience wrapper for Nsight Systems; replay the recorded bag in another terminal while the mapper is recording. Nsight Compute is available as a third argument `ncu`, but may need additional GPU profiling permissions on some systems.
+
+### Bash `nounset` compatibility (Humble/Jazzy)
+
+The distribution-selection helper temporarily disables Bash `set -u` while sourcing ROS
+(or an existing workspace) because optional ament environment variables might not
+be initialized. It restores the caller's previous strict-mode setting afterward.
+If working from an older copy, download the updated archive or make the same change
+in `scripts/detect_ros_distro.sh`.
