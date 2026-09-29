@@ -8,8 +8,8 @@ OUT="$2"
 mkdir -p "$OUT"
 OUT="$(realpath "$OUT")"
 if [[ ! -f "$BAG/metadata.yaml" ]]; then echo "Missing rosbag metadata.yaml" >&2; exit 2; fi
-: "${ROS_DISTRO:?Source ROS 2 Humble workspace first}"
-if [[ "$ROS_DISTRO" != "humble" ]]; then echo "Designed for ROS 2 Humble" >&2; exit 2; fi
+: "${ROS_DISTRO:?Source a ROS 2 Humble or Jazzy workspace first}"
+case "$ROS_DISTRO" in humble|jazzy) ;; *) echo "Requires humble or jazzy (got $ROS_DISTRO)" >&2; exit 2 ;; esac
 RUNS="${RUNS:-5}"
 WARMUP="${WARMUP:-100}"
 DEADLINE_MS="${DEADLINE_MS:-100}"

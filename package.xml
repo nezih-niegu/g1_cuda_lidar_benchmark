@@ -1,7 +1,7 @@
 <?xml version="1.0"?>
 <package format="3">
   <name>g1_cuda_lidar_benchmark</name>
-  <version>0.1.0</version>
+  <version>0.2.0</version>
   <description>MuJoCo G1 LiDAR DDS CPU, naive CUDA, and optimized CUDA mapping benchmark.</description>
   <maintainer email="benchmark@example.org">Benchmark example maintainers</maintainer>
   <license>MIT</license>

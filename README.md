@@ -1,6 +1,6 @@
-# G1 MuJoCo / ROS 2 Humble CUDA LiDAR benchmark
+# G1 MuJoCo / ROS 2 Humble + Jazzy CUDA LiDAR benchmark
 
-**Research prototype, not a verified turn-key build.** This package is designed to integrate with DFKI's [mujoco_ros2_control](https://github.com/dfki-ric/mujoco_ros2_control) `main` branch (its documented Humble branch), launching the **Unitree G1** humanoid example. The upstream simulator, model assets and LiDAR remain upstream rather than being duplicated. Verify the checked-out upstream commit's G1 demo/LiDAR support on Humble: features and documentation may differ across upstream branches. `unitree_g1.launch.py` and `/head/points` are *documented defaults for the newer G1 example*, not guaranteed for every `main` revision. Pin the exact upstream commit in a published experiment.
+**Research prototype, not a verified turn-key build.** This package is designed to integrate with DFKI's [mujoco_ros2_control](https://github.com/dfki-ric/mujoco_ros2_control) using `main` for **Humble** or `jazzy` for **Jazzy**, launching the **Unitree G1** humanoid example. The upstream simulator, model assets and LiDAR remain upstream rather than being duplicated. Verify the checked-out upstream commit's G1 demo/LiDAR support on your distribution: features and documentation may differ across upstream branches. `unitree_g1.launch.py` is documented upstream; `/head/points` is an adjustable example input, not a guaranteed LiDAR topic. Pin the exact upstream commit in a published experiment.
 
 This benchmark is a **LiDAR filtering + bounded voxel-map visualization** experiment, **not full SLAM** (no scan matching, loop closure, or pose estimation). A fixed humanoid is sufficient for a local map. For a *moving* humanoid, configure an independently provided TF world/map transform: otherwise clouds measured in the moving sensor frame cannot be accumulated as a world map. If upstream cannot supply that TF, keep `map_frame:=''` and report sensor-frame-only mapping.
 
@@ -27,29 +27,46 @@ All three variants use the same LiDAR producer, ROS topic type, QoS, radius thre
 
 ## Requirements
 
-- Ubuntu 22.04, ROS 2 Humble, `colcon`, `rosdep`, RViz2, a supported NVIDIA GPU/driver and a compatible installed CUDA Toolkit (`nvcc` and Nsight tools).
-- DFKI's upstream MuJoCo/ros2_control stack, Unitree G1 assets, and its example package built for **Humble**. Upstream installs have additional dependencies and potentially MuJoCo licensing/build requirements. See the pinned upstream README before installation.
+- **Either** Ubuntu 22.04 + ROS 2 Humble **or** Ubuntu 24.04 + ROS 2 Jazzy, plus `colcon`, `rosdep`, RViz2, a supported NVIDIA GPU/driver and compatible installed CUDA Toolkit (`nvcc` and Nsight tools).
+- DFKI's upstream MuJoCo/ros2_control stack, Unitree G1 assets, and its example package built for **your selected ROS distribution**. Upstream installs have additional dependencies and potentially MuJoCo licensing/build requirements. See the pinned upstream README before installation.
 - `libnvtx3-dev` or NVTX3 headers; CUDA Toolkit containing `nvcc` and Thrust. Install ROS dependencies using `rosdep` before build. GPU-only CUDA installation is not required if `-DBUILD_CUDA=OFF` is selected.
 
-### 1. Prepare the Humble workspace
+### 1. Prepare a Humble or Jazzy workspace
+
+| Host | ROS 2 | DFKI upstream branch |
+|---|---|---|
+| Ubuntu 22.04 | Humble | `main` |
+| Ubuntu 24.04 | Jazzy | `jazzy` |
+
+The benchmark's C++17, ROS messages, DDS QoS, launch files and CUDA kernels are common to both distributions. **Use one ROS distribution per workspace**; never source both in the same shell. The installed NVIDIA driver/toolkit must match the host and GPU independently of ROS.
 
 ```bash
-source /opt/ros/humble/setup.bash
-mkdir -p ~/g1_ws/src
-cd ~/g1_ws/src
-git clone -b main https://github.com/dfki-ric/mujoco_ros2_control.git
-# Copy the unzipped directory g1_cuda_lidar_benchmark here:
-# cp -r /path/to/g1_cuda_lidar_benchmark ./
+# Extract this package anywhere, then from its root:
+# Auto-select from supported Ubuntu version if no distro is supplied.
+# Choose BUILD_CUDA=OFF for initial CPU-only validation.
+BUILD_CUDA=ON bash scripts/setup_workspace.sh
+# Or explicitly:
+BUILD_CUDA=ON bash scripts/setup_workspace.sh humble
+BUILD_CUDA=ON bash scripts/setup_workspace.sh jazzy
+```
+
+This script selects `/opt/ros/$ROS_DISTRO`, clones the matching upstream branch, copies the benchmark to `~/g1_ws/src` if necessary, runs `rosdep` and builds. It does **not** install ROS 2, the NVIDIA driver or the CUDA Toolkit. Install those prerequisites first using the selected distribution's official instructions and the DFKI branch README. Inspect distro-specific additional dependencies if `rosdep` reports unresolved keys. If you prefer manual setup:
+
+```bash
+# In a clean terminal with ROS already installed (replace jazzy with humble):
+source /opt/ros/jazzy/setup.bash
+export G1_UPSTREAM_BRANCH=$([[ "$ROS_DISTRO" == jazzy ]] && echo jazzy || echo main)
+mkdir -p ~/g1_ws/src && cd ~/g1_ws/src
+git clone -b "$G1_UPSTREAM_BRANCH" https://github.com/dfki-ric/mujoco_ros2_control.git
+# Copy the extracted g1_cuda_lidar_benchmark/ directory into ~/g1_ws/src
 cd ~/g1_ws
 rosdep update
-rosdep install --from-paths src --ignore-src --rosdistro humble -y
-# The DFKI upstream project may need extra system/model dependencies:
-# follow that revision's installation notes first.
-colcon build --symlink-install --cmake-args -DBUILD_CUDA=ON
+rosdep install --from-paths src --ignore-src --rosdistro "$ROS_DISTRO" -y
+colcon build --symlink-install --cmake-args -DBUILD_CUDA=ON -DCMAKE_BUILD_TYPE=Release
 source install/setup.bash
 ```
 
-If ROS 2 Humble's Ubuntu 22.04 package does not provide usable NVTX3 headers, install the CUDA Toolkit's matching NVTX3 development headers. Re-run `colcon build`. Avoid mixing different MuJoCo control repositories or Jazzy binaries in the same Humble workspace.
+For terminal setup after installation, run `source /opt/ros/<distro>/setup.bash` and `source ~/g1_ws/install/setup.bash` (replace `<distro>` with your choice), or in a **clean shell** `source ~/g1_ws/src/g1_cuda_lidar_benchmark/scripts/detect_ros_distro.sh` to auto-detect your OS. See [distribution compatibility](docs/distribution_compatibility.md).
 
 ### 2. Launch the *upstream* humanoid simulator
 
@@ -67,14 +84,15 @@ ros2 topic info /head/points -v
 ros2 topic hz /head/points
 ```
 
-Confirm the upstream G1 LiDAR publishes `sensor_msgs/msg/PointCloud2`. If your Humble `main` checkout lacks the G1+LiDAR example (or uses different topic naming), you must port/enable its G1 LiDAR scene/configuration from a compatible upstream revision; do **not** pretend synthetic generated clouds are MuJoCo LiDAR. Alternatively run an upstream branch/revision whose G1 example and dependencies are known to build for Humble. Pass the observed LiDAR topic to `source_topic:=...`.
+Confirm the upstream G1 LiDAR publishes `sensor_msgs/msg/PointCloud2`. If your selected upstream checkout lacks the G1+LiDAR example (or uses different topic naming), you must port/enable its G1 LiDAR scene/configuration from a compatible upstream revision; do **not** pretend synthetic generated clouds are MuJoCo LiDAR. Alternatively run an upstream branch/revision whose G1 example and dependencies are known to build for Humble. Pass the observed LiDAR topic to `source_topic:=...`.
 
 ### 3. Run a mode
 
 ```bash
 # Terminal B, always source the same workspace
+source /opt/ros/${ROS_DISTRO:?Select Humble or Jazzy in a clean shell}/setup.bash
 source ~/g1_ws/install/setup.bash
-export RMW_IMPLEMENTATION=rmw_cyclonedds_cpp  # requires ros-humble-rmw-cyclonedds-cpp
+export RMW_IMPLEMENTATION=rmw_cyclonedds_cpp  # install ros-${ROS_DISTRO}-rmw-cyclonedds-cpp
 ros2 launch g1_cuda_lidar_benchmark benchmark.launch.py \
   source_topic:=/head/points backend:=cpu csv_path:=/tmp/g1_cpu.csv
 ```
@@ -154,7 +172,7 @@ Target 10 Hz scans and a 100 ms callback deadline initially, then sweep points p
 ## Included development aids
 
 - `launch/smoke.launch.py` + `scripts/synthetic_lidar.py`: deterministic **non-MuJoCo** DDS integration smoke test. Run `ros2 launch g1_cuda_lidar_benchmark smoke.launch.py backend:=cpu` and inspect `/benchmark/map_points` or `/tmp/g1_smoke.csv`.
-- `scripts/run_three_modes.sh`: automates five separate CPU/naive/optimized rosbag replay passes by default. Source the built Humble workspace first, stop the simulator and relay, then run `RUNS=5 bash src/g1_cuda_lidar_benchmark/scripts/run_three_modes.sh /tmp/g1_reference /tmp/g1_experiment`. Beware: ROS bag may need more startup time; `SLEEP_READY=5` adjusts this. Set `PLAY_CLOCK=1` only for bags without a recorded `/clock` topic, when a generated playback clock is needed. A single bag replay is not guaranteed to deliver exactly equal callback counts under BEST_EFFORT, so compare `frames` and check delivery loss before drawing conclusions.
+- `scripts/run_three_modes.sh`: automates five separate CPU/naive/optimized rosbag replay passes by default. Source the built Humble or Jazzy workspace first, stop the simulator and relay, then run `RUNS=5 bash src/g1_cuda_lidar_benchmark/scripts/run_three_modes.sh /tmp/g1_reference /tmp/g1_experiment`. Beware: ROS bag may need more startup time; `SLEEP_READY=5` adjusts this. Set `PLAY_CLOCK=1` only for bags without a recorded `/clock` topic, when a generated playback clock is needed. A single bag replay is not guaranteed to deliver exactly equal callback counts under BEST_EFFORT, so compare `frames` and check delivery loss before drawing conclusions.
 - `scripts/collect_system_info.sh`: writes reproducibility metadata, including NVIDIA driver/toolkit and upstream checkout revision.
 - `scripts/summary_across_runs.py`: computes run-level means and 95% t-confidence intervals (normal approximation for 5+ runs); do not mistake per-frame correlations for independent replicates.
 - `tests/`: standard-library offline tests for CSV reports and source-level scaffolding, runnable without a ROS installation with `python3 -m unittest discover -s tests -v`.
